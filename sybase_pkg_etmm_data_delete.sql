@@ -1,122 +1,80 @@
-/*
-select
-     error
-    ,severity
-    ,dlevel
-    ,description
-    ,langid
-    ,[sqlstate]
-from master..sysmessages
-*/
-drop procedure etmm_data_delete_all
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_all') and type = 'P') 
+   drop procedure etmm_data_delete_all
 go
 create procedure etmm_data_delete_all @tbl varchar(64)
 as
 begin
-  
-  declare @error_msg varchar(1000)
   print @tbl
-  if object_id(@tbl) > 0
-    begin
-      exec ('delete from ' + @tbl)
-    end
-  else
-    begin
-      select @error_msg = 'Table "' + @tbl + '" does not exists'
-      print @error_msg
-      raiserror 30001 @error_msg
-    end
+  exec ('delete from ' + @tbl)
 end
 go
 --exec etmm_data_delete_all 'BREACH' go
-
-drop procedure etmm_data_delete_some go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_some') and type = 'P') 
+   drop procedure etmm_data_delete_some
+go
 create procedure etmm_data_delete_some @cob_date datetime, @tbl varchar(64), @ops varchar(10)
 as
 begin
-  declare @error_msg varchar(1000)
   declare @stmt varchar(256)
   print @tbl
-  if object_id(@tbl) > 0
-    begin
-      -- need to check @ops variable for validity
-      select @stmt = "delete from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
-      exec (@stmt)
-    end
-  else
-    begin
-      select @error_msg = 'Table "' + @tbl + '" does not exists'
-      print @error_msg
-      raiserror 30001 @error_msg
-    end
+  set @stmt = "delete from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
+  exec (@stmt)
 end
 go
 --execute etmm_data_delete_some 'Jan 23, 2013', 'breach', '>' go
 
-drop procedure etmm_data_delete_cascade go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_cascade') and type = 'P') 
+   drop procedure etmm_data_delete_cascade 
+go
 create procedure etmm_data_delete_cascade @tbl varchar(64), @parent_table varchar(64), @fk_name varchar(64)
 as
 begin
-  declare @error_msg varchar(1000)
   declare @stmt varchar(256)
   print @tbl
-  if object_id(@tbl) > 0 and object_id(@parent_table) > 0
-    begin
-      select @stmt = "delete from " + @tbl + " c where not exists (select 1 from " + @parent_table + " p where c." + @fk_name + "=p."+ @fk_name + ")"
-      exec (@stmt)
-    end
-  else
-    begin
-      select @error_msg = 'Table "' + @tbl + '" or "'+ @parent_table + '" does not exists'
-      print @error_msg
-      raiserror 30001 @error_msg
-    end
+  select @stmt = "delete from " + @tbl + " c where not exists (select 1 from " + @parent_table + " p where c." + @fk_name + "=p."+ @fk_name + ")"
 end
 go
 --need to create test for etmm_data_delete_cascade
 
-drop procedure etmm_data_delete_audit go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_audit') and type = 'P') 
+   drop procedure etmm_data_delete_audit
+go
 create procedure etmm_data_delete_audit @tbl varchar(64), @fk_name varchar(64)
 as
 begin
-  declare @error_msg varchar(1000)
   declare @stmt varchar(256)
   print 'entity_audit'
-  if object_id(@tbl) > 0
-    begin
-      select @stmt = "delete from entity_audit c where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where c.entity_id=p." + @fk_name +")"
-      exec (@stmt)
-    end
-  else
-    begin
-      select @error_msg = 'Table "' + @tbl + '" does not exists'
-      print @error_msg
-      raiserror 30001 @error_msg
-    end
+  select @stmt = "delete from entity_audit c where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where c.entity_id=p." + @fk_name +")"
+  exec (@stmt)
 end
 go
 --need to create test for etmm_data_delete_audit
 
-drop procedure etmm_data_delete_other go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_other') and type = 'P') 
+   drop procedure etmm_data_delete_other
+go
+
 create procedure etmm_data_delete_other @cob_date date, @tbl varchar(64)
 as exec etmm_data_delete_some @cob_date, @tbl, '<>'
 go
 --need to create test for etmm_data_delete_other
 
-drop procedure etmm_data_delete_this go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_this') and type = 'P') 
+   drop procedure etmm_data_delete_this 
+go
 create procedure etmm_data_delete_this @cob_date date, @tbl varchar(64)
 as exec etmm_data_delete_some @cob_date, @tbl, '='
 go
 --need to create test for etmm_data_delete_this
 
-drop procedure etmm_data_internal_delete_business go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_internal_delete_business') and type = 'P') 
+   drop procedure etmm_data_internal_delete_business
+go
 create procedure etmm_data_internal_delete_business @cob_date date 
 as
 begin
-  declare @nl char(2)
-  select @nl = char(13) + char(10)
   print 'Removing business data..'
-  print @nl
+  print ''
   
   exec etmm_data_delete_this @cob_date, 'breach'  
   exec etmm_data_delete_audit 'breach', 'breach_id'  
@@ -134,23 +92,24 @@ begin
   exec etmm_data_delete_cascade 'breach_comp_attr_cache', 'breach', 'breach_id'    
   exec etmm_data_delete_cascade 'owner_comp_attr_cache', 'breach_owner', 'owner_id'    
   
-  print @nl
+  print ''
   print 'Removing audit data..'
-  print @nl
+  print ''
   exec etmm_data_delete_cascade 'entity_audit_detail', 'entity_audit', 'entity_audit_id'
-  print @nl  
+  print ''  
   
 end
 go
 --need to create test for etmm_data_delete_business
 
-drop function etmm_data_get_latest_cob go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_get_latest_cob') and type = 'SF') 
+   drop function etmm_data_get_latest_cob 
+go
 create function etmm_data_get_latest_cob
 returns date
 as
 begin
   declare @latest_cob_date date
-  
   declare c1 cursor for select top 1 cob_date from cob order by cob_date desc
   open c1
   fetch c1 into @latest_cob_date
@@ -161,7 +120,9 @@ end
 go
 --select dbo.etmm_data_get_latest_cob()
 
-drop function etmm_data_delete_is_initialized go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_is_initialized') and type = 'SF') 
+   drop function etmm_data_delete_is_initialized 
+go
 create function etmm_data_delete_is_initialized
 returns bit
 as
@@ -176,8 +137,9 @@ end
 go
 
 --select dbo.etmm_data_delete_is_initialized()
-
-drop function etmm_data_is_delete_enabled go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_is_delete_enabled') and type = 'SF') 
+   drop function etmm_data_is_delete_enabled 
+go
 create function etmm_data_is_delete_enabled
 returns bit
 as
@@ -191,7 +153,9 @@ end
 go
 --select dbo.etmm_data_is_delete_enabled()
 
-drop procedure etmm_data_delete_restrict go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_restrict') and type = 'P') 
+   drop procedure etmm_data_delete_restrict 
+go
 create procedure etmm_data_delete_restrict @optn varchar(64)
 as
 begin
@@ -208,7 +172,9 @@ go
 -- exec etmm_data_delete_restrict 'enable' go
 -- select * from etmm_system_setting where setting_name = 'RTB_MANUAL_DATA_DELETE' go
 
-drop table etmm_foreign_key go
+if exists (select 1 from sysobjects where id = object_id('etmm_foreign_key') and type = 'U') 
+   drop table etmm_foreign_key 
+go
 create table etmm_foreign_key (
   constraint_name     varchar(64),
   table_name         varchar(64),
@@ -217,7 +183,10 @@ create table etmm_foreign_key (
   refkey_columns     varchar(512)
 )
 go
-drop procedure etmm_foreign_key_refresh go
+
+if exists (select 1 from sysobjects where id = object_id('etmm_foreign_key_refresh') and type = 'P') 
+   drop procedure etmm_foreign_key_refresh 
+go
 create procedure etmm_foreign_key_refresh @truncate_first bit
 as
 begin
@@ -270,7 +239,9 @@ go
 
 -- select * from etmm_foreign_key
 
-drop procedure etmm_data_manage_constraints go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_manage_constraints') and type = 'P') 
+   drop procedure etmm_data_manage_constraints 
+go
 create procedure etmm_data_manage_constraints @optn varchar(32), @constrnt varchar(128)
 as
 begin
@@ -312,7 +283,9 @@ begin
 end
 go
 
-drop procedure etmm_data_manage_triggers go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_manage_triggers') and type = 'P') 
+   drop procedure etmm_data_manage_triggers 
+go
 create procedure etmm_data_manage_triggers @optn varchar(32), @trigger_name varchar(128)
 as
 begin
@@ -363,25 +336,25 @@ begin
 end
 go
 
-drop procedure etmm_data_delete_for_cob_date go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_for_cob_date') and type = 'P') 
+   drop procedure etmm_data_delete_for_cob_date 
+go
 create procedure etmm_data_delete_for_cob_date @cob_date date
 as
 begin
-  declare @nl char(2)
   declare @stmt varchar(1024)
-  set @nl = char(13)||char(10)
   if dbo.etmm_data_is_delete_enabled() = 1
     begin
           print 'ETMM Data Delete'
           set @stmt = 'This routine will remove business and history data for date:' + convert(varchar(12), @cob_date) + ' existing in the environment: ' + user_name()  
           print @stmt 
-          print @nl
+          print ''
           exec etmm_data_manage_constraints 'disable', 'all'
           exec etmm_data_manage_triggers 'disable', 'all'
           print 'Processing'
-          print @nl
+          print ''
           print 'Removing history data..'
-          print @nl
+          print ''
           exec etmm_data_delete_this @cob_date, 'limit_detail_hist'
           exec etmm_data_delete_this @cob_date, 'exposure_detail_hist'
           exec etmm_data_delete_this @cob_date, 'money_market_trade_hist'
@@ -389,11 +362,11 @@ begin
           exec etmm_data_delete_this @cob_date, 'cb_trade_hist'
           exec etmm_data_delete_this @cob_date, 'portfolio_detail_hist'
           exec etmm_data_delete_this @cob_date, 'owner_hist'
-          print @nl
+          print ''
           exec etmm_data_internal_delete_business @cob_date
           print 'Removing COB'
           exec etmm_data_delete_this @cob_date, 'cob'
-          print @nl
+          print ''
           exec etmm_data_manage_triggers 'enable', 'all'
           exec etmm_data_manage_constraints 'enable', 'all'
           commit
@@ -403,7 +376,9 @@ end
 go
 --needs testing
 
-drop procedure etmm_data_delete_business_for_cob_date go
+if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_business_for_cob_date') and type = 'P') 
+   drop procedure etmm_data_delete_business_for_cob_date 
+go
 create procedure etmm_data_delete_business_for_cob_date @cob_date date
 as
 begin
@@ -414,15 +389,15 @@ begin
           set @msg = 'This routine will remove business data for date:' || convert(varchar(12), @cob_date) || ' existing in the environment: ' || user_name()  
           print @msg  
           print ''
-          exec etmm_data_delete_manage_constraints 'disable', 'all'
-          exec etmm_data_delete_manage_triggers 'disable', 'all'
+          exec etmm_data_manage_constraints 'disable', 'all'
+          exec etmm_data_manage_triggers 'disable', 'all'
           set @msg = 'Processing ' + convert(varchar(32), @cob_date) 
           print @msg
           print ''
           exec etmm_data_internal_delete_business @cob_date
 
-          exec etmm_data_delete_manage_triggers 'enable', 'all'
-          exec etmm_data_delete_manage_constraints 'enable', 'all'
+          exec etmm_data_manage_triggers 'enable', 'all'
+          exec etmm_data_manage_constraints 'enable', 'all'
           commit
     end
     exec etmm_data_delete_restrict 'disable'
