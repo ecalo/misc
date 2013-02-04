@@ -5,7 +5,9 @@ create procedure etmm_data_delete_all @tbl varchar(64)
 as
 begin
   print @tbl
-  exec ('delete from ' + @tbl)
+--  exec ('delete from ' + @tbl)
+  set @tbl = 'delete from ' + @tbl
+  print @tbl
 end
 go
 --exec etmm_data_delete_all 'BREACH' go
@@ -18,7 +20,8 @@ begin
   declare @stmt varchar(256)
   print @tbl
   set @stmt = "delete from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
-  exec (@stmt)
+  print @stmt
+--  exec (@stmt)
 end
 go
 --execute etmm_data_delete_some 'Jan 23, 2013', 'breach', '>' go
@@ -31,7 +34,9 @@ as
 begin
   declare @stmt varchar(256)
   print @tbl
-  select @stmt = "delete from " + @tbl + " c where not exists (select 1 from " + @parent_table + " p where c." + @fk_name + "=p."+ @fk_name + ")"
+  set @stmt = "delete from " + @tbl + " where not exists (select 1 from " + @parent_table + " p where " + @tbl + "." + @fk_name + "=p."+ @fk_name + ")"
+  print @stmt
+--  exec (@stmt)
 end
 go
 --need to create test for etmm_data_delete_cascade
@@ -44,8 +49,9 @@ as
 begin
   declare @stmt varchar(256)
   print 'entity_audit'
-  select @stmt = "delete from entity_audit c where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where c.entity_id=p." + @fk_name +")"
-  exec (@stmt)
+  set @stmt = "delete from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200)," + @tbl + "." + @fk_name +"))"
+  print @stmt
+--  exec (@stmt)
 end
 go
 --need to create test for etmm_data_delete_audit
@@ -258,7 +264,7 @@ begin
 	  where lower(@constrnt) = (case when upper(@constrnt) = 'ALL' then lower(@constrnt) else lower(constraint_name) end) 
 
   set @optn = upper(@optn)
-  if @optn = 'ENABLE' execute etmm_foreign_key_refresh 0 
+  if @optn = 'DISABLE' execute etmm_foreign_key_refresh 0 
   open c
   fetch c into @constraint_name, @table_name, @fk_columns, @reftable_name, @refkey_columns 
   
