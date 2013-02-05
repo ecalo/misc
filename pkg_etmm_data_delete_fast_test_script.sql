@@ -1,4 +1,19 @@
-drop table #pkg_etmm_data_delete go
+/*
+	Notes:
+	
+	1. The main use of this package is to delete some records in several tables. 
+		Performing actual delete will be very time-consuming so instead, all delete statements are converted into 'select count(*) from ...' instead of 'delete from ...'
+
+	2. Results are saved into a temporary table and queried at the end of test routine.
+	3. Same modification is #1 is done in Oracle script and then test is ran.
+	4. Rows affected on both databases are compared.
+	5. When the test is done, there's a need to recompile the actual procedures found in a separate file.
+	
+*/
+
+if exists (select 1 from tempdb..sysobjects where id = object_id('#pkg_etmm_data_delete') and type = 'U')
+   drop table #pkg_etmm_data_delete 
+go
 create table #pkg_etmm_data_delete(
    id int identity primary key,
    rowcnt int null, 
@@ -20,7 +35,7 @@ begin
 --  exec ('delete from ' + @tbl)
 end
 go
---exec etmm_data_delete_all 'BREACH' go
+
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_some') and type = 'P') 
    drop procedure etmm_data_delete_some
 go
@@ -29,15 +44,14 @@ as
 begin
   declare @stmt varchar(256)
   print @tbl
-  set @stmt = "delete from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
+  set @stmt = "delete from " + @tbl + " where cob_date " + @ops + " '" + convert(varchar(64),@cob_date) + "'"
   insert into #pkg_etmm_data_delete(ddl) values (@stmt)
-  set @stmt = "select count(*) from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
+  set @stmt = "select count(*) from " + @tbl + " where cob_date " + @ops + " '" + convert(varchar(64),@cob_date) + "'"
   set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (' + @stmt + ') where id = ' + convert(varchar(10),@@identity)
   exec (@stmt) 
 --  exec (@stmt)
 end
 go
---execute etmm_data_delete_some 'Jan 23, 2013', 'breach', '>' go
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_cascade') and type = 'P') 
    drop procedure etmm_data_delete_cascade 
@@ -55,25 +69,23 @@ begin
 --  exec (@stmt)
 end
 go
---need to create test for etmm_data_delete_cascade
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_audit') and type = 'P') 
    drop procedure etmm_data_delete_audit
 go
-create procedure etmm_data_delete_audit @tbl varchar(64), @fk_name varchar(64)
+create procedure etmm_data_delete_audit @tbl varchar(64), @fk_name varchar(64), @convert_to_int bit = 0
 as
 begin
   declare @stmt varchar(256)
   print 'entity_audit'
-  set @stmt = "delete from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200),p." + @fk_name +"))"
+  set @stmt = "delete from entity_audit where entity_name = '" + UPPER(@tbl) +"' and not exists (select 1 from " + @tbl + " p where " + case @convert_to_int when 0 then "entity_audit.entity_id" else "convert(numeric(12),entity_audit.entity_id)" end +"=p." + @fk_name +")"
   insert into #pkg_etmm_data_delete(ddl) values (@stmt)
-  set @stmt = "select count(*) from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200),p." + @fk_name +"))"
+  set @stmt = "select count(*) from entity_audit where entity_name = '" + UPPER(@tbl) +"' and not exists (select 1 from " + @tbl + " p where " + case @convert_to_int when 0 then "entity_audit.entity_id" else "convert(numeric(12),entity_audit.entity_id)" end +"=p." + @fk_name +")"
   set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (' + @stmt + ') where id = ' + convert(varchar(10),@@identity)
   exec (@stmt) 
 --  exec (@stmt)
 end
 go
---need to create test for etmm_data_delete_audit
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_other') and type = 'P') 
    drop procedure etmm_data_delete_other
@@ -82,7 +94,6 @@ go
 create procedure etmm_data_delete_other @cob_date date, @tbl varchar(64)
 as exec etmm_data_delete_some @cob_date, @tbl, '<>'
 go
---need to create test for etmm_data_delete_other
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_this') and type = 'P') 
    drop procedure etmm_data_delete_this 
@@ -90,7 +101,6 @@ go
 create procedure etmm_data_delete_this @cob_date date, @tbl varchar(64)
 as exec etmm_data_delete_some @cob_date, @tbl, '='
 go
---need to create test for etmm_data_delete_this
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_internal_delete_business') and type = 'P') 
    drop procedure etmm_data_internal_delete_business
@@ -102,7 +112,7 @@ begin
   print ''
   
   exec etmm_data_delete_this @cob_date, 'breach'  
-  exec etmm_data_delete_audit 'breach', 'breach_id'  
+  exec etmm_data_delete_audit 'breach', 'breach_id', 1  
   exec etmm_data_delete_this @cob_date, 'feed_statistic'    
   
   exec etmm_data_delete_cascade 'breach_review_action_hist', 'breach', 'breach_id'    
@@ -125,7 +135,6 @@ begin
   
 end
 go
---need to create test for etmm_data_delete_business
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_get_latest_cob') and type = 'SF') 
    drop function etmm_data_get_latest_cob 
@@ -143,7 +152,6 @@ begin
   return @latest_cob_date
 end
 go
---select dbo.etmm_data_get_latest_cob()
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_is_initialized') and type = 'SF') 
    drop function etmm_data_delete_is_initialized 
@@ -161,7 +169,6 @@ begin
 end
 go
 
---select dbo.etmm_data_delete_is_initialized()
 if exists (select 1 from sysobjects where id = object_id('etmm_data_is_delete_enabled') and type = 'SF') 
    drop function etmm_data_is_delete_enabled 
 go
@@ -176,7 +183,6 @@ begin
   return @res
 end
 go
---select dbo.etmm_data_is_delete_enabled()
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_restrict') and type = 'P') 
    drop procedure etmm_data_delete_restrict 
@@ -194,8 +200,6 @@ begin
   commit
 end
 go
--- exec etmm_data_delete_restrict 'enable' go
--- select * from etmm_system_setting where setting_name = 'RTB_MANUAL_DATA_DELETE' go
 
 if exists (select 1 from sysobjects where id = object_id('etmm_foreign_key') and type = 'U') 
    drop table etmm_foreign_key 
@@ -261,8 +265,6 @@ begin
   
 end
 go
-
--- select * from etmm_foreign_key
 
 if exists (select 1 from sysobjects where id = object_id('etmm_data_manage_constraints') and type = 'P') 
    drop procedure etmm_data_manage_constraints 
