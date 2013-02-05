@@ -1,13 +1,23 @@
+drop table #pkg_etmm_data_delete go
+create table #pkg_etmm_data_delete(
+   id int identity primary key,
+   rowcnt int null, 
+   ddl varchar(1000) null
+)
+go
 if exists (select 1 from sysobjects where id = object_id('etmm_data_delete_all') and type = 'P') 
    drop procedure etmm_data_delete_all
 go
 create procedure etmm_data_delete_all @tbl varchar(64)
 as
 begin
+  declare @stmt varchar(1000)
   print @tbl
+  set @stmt = 'delete from ' + @tbl
+  insert into #pkg_etmm_data_delete(ddl) values (@stmt)
+  set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (select count(*) from ' + @tbl +') where id = ' + convert(varchar(10),@@identity)
+  exec (@stmt) 
 --  exec ('delete from ' + @tbl)
-  set @tbl = 'delete from ' + @tbl
-  print @tbl
 end
 go
 --exec etmm_data_delete_all 'BREACH' go
@@ -20,7 +30,10 @@ begin
   declare @stmt varchar(256)
   print @tbl
   set @stmt = "delete from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
-  print @stmt
+  insert into #pkg_etmm_data_delete(ddl) values (@stmt)
+  set @stmt = "select count(*) from " + @tbl + " where cob_date " + @ops + " convert(date,'" + convert(varchar(64),@cob_date) + "',5)"
+  set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (' + @stmt + ') where id = ' + convert(varchar(10),@@identity)
+  exec (@stmt) 
 --  exec (@stmt)
 end
 go
@@ -35,7 +48,10 @@ begin
   declare @stmt varchar(256)
   print @tbl
   set @stmt = "delete from " + @tbl + " where not exists (select 1 from " + @parent_table + " p where " + @tbl + "." + @fk_name + "=p."+ @fk_name + ")"
-  print @stmt
+  insert into #pkg_etmm_data_delete(ddl) values (@stmt)
+  set @stmt = "select count(*) from " + @tbl + " where not exists (select 1 from " + @parent_table + " p where " + @tbl + "." + @fk_name + "=p."+ @fk_name + ")"
+  set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (' + @stmt + ') where id = ' + convert(varchar(10),@@identity)
+  exec (@stmt) 
 --  exec (@stmt)
 end
 go
@@ -49,8 +65,11 @@ as
 begin
   declare @stmt varchar(256)
   print 'entity_audit'
-  set @stmt = "delete from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200)," + @tbl + "." + @fk_name +"))"
-  print @stmt
+  set @stmt = "delete from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200),p." + @fk_name +"))"
+  insert into #pkg_etmm_data_delete(ddl) values (@stmt)
+  set @stmt = "select count(*) from entity_audit where entity_name = UPPER('"+ @tbl +"') and not exists (select 1 from " + @tbl + " p where entity_audit.entity_id=convert(varchar(200),p." + @fk_name +"))"
+  set @stmt = 'update #pkg_etmm_data_delete set rowcnt = (' + @stmt + ') where id = ' + convert(varchar(10),@@identity)
+  exec (@stmt) 
 --  exec (@stmt)
 end
 go
@@ -409,3 +428,18 @@ begin
     exec etmm_data_delete_restrict 'disable'
 end
 go
+
+begin
+if exists (select 1 from tempdb..sysobjects where id = object_id('#pkg_etmm_data_delete') and type = 'U')
+   truncate table #pkg_etmm_data_delete
+else
+   create table #pkg_etmm_data_delete(
+      id int identity primary key,
+      rowcnt int null, 
+      ddl varchar(1000) null
+   )      
+execute etmm_foreign_key_refresh 1
+execute etmm_data_delete_restrict 'enable'
+execute etmm_data_delete_business_for_cob_date '16-NOV-2011'
+select * from #pkg_etmm_data_delete
+end

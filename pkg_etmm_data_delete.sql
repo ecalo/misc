@@ -1,29 +1,4 @@
 create or replace 
-PACKAGE "PKG_ETMM_DATA_DELETE" AS
-	c_all CONSTANT VARCHAR2(10) := 'ALL';
-	c_disable CONSTANT VARCHAR2(10) := 'DISABLE';
-	c_enable CONSTANT VARCHAR2(10) := 'ENABLE';
-
-	/*
-	 * restrict execution of delete procedures
-	 * optn => c_enable / c_disable
-	 */
-	PROCEDURE p_restrict(optn IN VARCHAR2);
-
-	/*
-	 * delete everything from specified COB
-	 * cob_date => date to use
-	 */
-	PROCEDURE p_delete_for_cob_date(cob_date IN cob.cob_date%TYPE);
-
-	/*
-	 * delete business data from specified COB
-	 * cob_date => date to use
-	 */
-	PROCEDURE p_delete_business_for_cob_date(cob_date IN cob.cob_date%TYPE);
-END PKG_ETMM_DATA_DELETE;
-
-create or replace 
 PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	-- private constants
 
@@ -38,9 +13,11 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	 * tbl => table name
 	 */
 	PROCEDURE p_delete_all(tbl IN VARCHAR2) IS
+    rowcount int; 
 	BEGIN
-		dbms_output.put_line(tbl);
-		EXECUTE IMMEDIATE ('DELETE FROM '||tbl);
+		dbms_output.put_line('DELETE FROM '||tbl);
+		EXECUTE IMMEDIATE ('select count(*) FROM '||tbl) into rowcount;
+        dbms_output.put_line('rows affected: ' || to_char(rowcount));
 	EXCEPTION WHEN OTHERS THEN
 		dbms_output.put_line(sqlerrm);
 		RAISE;
@@ -54,9 +31,11 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	 * ops => comparison operator for cob date
 	 */
 	PROCEDURE p_delete_some(cob_date IN cob.cob_date%TYPE, tbl IN VARCHAR2, ops IN VARCHAR2) IS
+    rowcount int;
 	BEGIN
-		dbms_output.put_line(tbl);
-		EXECUTE IMMEDIATE ('DELETE FROM '||tbl||' WHERE cob_date '||ops||' to_date('''||cob_date||''', ''dd-mon-yy'')');
+		dbms_output.put_line('DELETE FROM '||tbl||' WHERE cob_date '||ops||' to_date('''||cob_date||''', ''dd-mon-yy'')');
+		EXECUTE IMMEDIATE ('select count(*) FROM '||tbl||' WHERE cob_date '||ops||' to_date('''||cob_date||''', ''dd-mon-yy'')') into rowcount;
+    dbms_output.put_line('rows affected: ' || to_char(rowcount));
 	EXCEPTION WHEN OTHERS THEN
 		dbms_output.put_line(sqlerrm);
 		RAISE;
@@ -69,10 +48,13 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	 * fk_name => cascade column (FK)
 	 */
 	PROCEDURE p_delete_cascade(tbl IN VARCHAR2, parent_table IN VARCHAR2, fk_name IN VARCHAR2) IS
+    rowcount int;
 	BEGIN
-		dbms_output.put_line(tbl);
-		EXECUTE IMMEDIATE ('DELETE FROM '||tbl||' c WHERE NOT EXISTS ('||
+		dbms_output.put_line('DELETE FROM '||tbl||' c WHERE NOT EXISTS ('||
 			'select 1 from '||parent_table||' p where c.'||fk_name||' = p.'||fk_name||')');
+		EXECUTE IMMEDIATE ('select count(*) FROM '||tbl||' c WHERE NOT EXISTS ('||
+			'select 1 from '||parent_table||' p where c.'||fk_name||' = p.'||fk_name||')') into rowcount;
+    dbms_output.put_line('rows affected: ' || to_char(rowcount));
 	END;
 
 	/*
@@ -81,10 +63,13 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	 * fk_name => cascade column (FK)
 	 */
 	PROCEDURE p_delete_audit(tbl IN VARCHAR2, fk_name IN VARCHAR2) IS
+    rowcount int;
 	BEGIN
-		dbms_output.put_line('entity_audit');
-		EXECUTE IMMEDIATE ('DELETE FROM entity_audit c WHERE entity_name = UPPER('''||tbl||''') AND NOT EXISTS ('||
+		dbms_output.put_line('DELETE FROM entity_audit c WHERE entity_name = UPPER('''||tbl||''') AND NOT EXISTS ('||
 			'select 1 from '||tbl||' p where c.entity_id = p.'||fk_name||')');
+		EXECUTE IMMEDIATE ('select count(*) FROM entity_audit c WHERE entity_name = UPPER('''||tbl||''') AND NOT EXISTS ('||
+			'select 1 from '||tbl||' p where c.entity_id = p.'||fk_name||')') into rowcount;
+    dbms_output.put_line('rows affected: ' || to_char(rowcount));
 	END;
 
 	/*
@@ -319,7 +304,7 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 			p_restrict(c_disable);
 			dbms_output.put_line(sqlerrm);
 	END;
-    --1245 seconds as tested on Oracle using OCT 22 2012 cob_date.
+
 	PROCEDURE p_delete_business_for_cob_date(cob_date IN cob.cob_date%TYPE) IS
 	BEGIN
 		IF (f_is_delete_enabled()) THEN
@@ -349,3 +334,15 @@ PACKAGE BODY "PKG_ETMM_DATA_DELETE" AS
 	END;
 
 END PKG_ETMM_DATA_DELETE;
+
+/* Test script */
+/*
+SET LINESIZE 150;
+SET SERVEROUTPUT on SIZE 1000000 FORMAT TRUNCATED;
+--
+--
+set echo on;
+
+exec  pkg_etmm_data_delete.p_restrict('ENABLE');
+exec  pkg_etmm_data_delete.p_delete_business_for_cob_date('16-NOV-2011');
+*/
